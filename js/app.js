@@ -11,11 +11,11 @@
 //   notes.js       メモの切替・自動保存・メモ一覧シート
 //   export.js      「保存」ボタン（.md ダウンロード）
 //   plugins.js     Ribbon プラグインAPIと管理UI
-//   viewport.js    キーボード対応・タブ切替・スクロール同期・PWAインストール
+//   viewport.js    タブ切替・スクロール同期・PWAインストール
 //   highlight.js   特殊文字ハイライトのオーバーレイ描画
 //   settings.js    文字サイズ・ハイライト設定の永続化とUI配線
 
-import { initViewportFix, initTabs, initPwa } from './viewport.js';
+import { initTabs, initPwa } from './viewport.js';
 import { initToolbar } from './toolbar.js';
 import { initNotes } from './notes.js';
 import { initExport } from './export.js';
@@ -24,7 +24,6 @@ import { initSettings } from './settings.js';
 
 marked.setOptions({ breaks: true, gfm: true });
 
-initViewportFix();
 initTabs();
 initToolbar();
 initNotes();
