@@ -30,6 +30,10 @@
   const pluginItemsEl = $('#pluginItems');
   const addPluginBtn = $('#addPluginBtn');
   const pluginFileInput = $('#pluginFileInput');
+  const formatToolbarEl = $('#formatToolbar');
+  const exportSheet = $('#exportSheet');
+  const exportOverlay = $('#exportOverlay');
+  const exportFormatsEl = $('#exportFormats');
 
   /* ------------------------------------------------------------------ */
   /* 保存先について：
@@ -849,9 +853,37 @@
       b.setAttribute('aria-selected', String(active));
     });
     tabIndicator.style.transform = view === 'preview' ? 'translateX(100%)' : 'translateX(0%)';
-    if (view === 'preview') editorEl.blur();
+    if (view === 'preview') {
+      editorEl.blur();
+      document.documentElement.style.setProperty('--toolbar-bottom', '0px');
+    } else {
+      updateToolbarViewport();
+    }
   }
   tabButtons.forEach((btn) => btn.addEventListener('click', () => setView(btn.dataset.view)));
+
+  /* ------------------------------------------------------------------ */
+  /* キーボード直上にツールバーを固定（Visual Viewport API）              */
+  /* ------------------------------------------------------------------ */
+
+  function updateToolbarViewport() {
+    if (!formatToolbarEl || appEl.dataset.view === 'preview') return;
+    const vv = window.visualViewport;
+    if (!vv) {
+      document.documentElement.style.setProperty('--toolbar-bottom', '0px');
+      return;
+    }
+    const keyboardGap = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+    document.documentElement.style.setProperty('--toolbar-bottom', `${keyboardGap}px`);
+  }
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', updateToolbarViewport);
+    window.visualViewport.addEventListener('scroll', updateToolbarViewport);
+  }
+  window.addEventListener('resize', updateToolbarViewport);
+  editorEl.addEventListener('focus', () => { requestAnimationFrame(updateToolbarViewport); });
+  updateToolbarViewport();
 
   /* ------------------------------------------------------------------ */
   /* メモ切替                                                             */
@@ -954,18 +986,191 @@
   });
 
   /* ------------------------------------------------------------------ */
-  /* 保存（.md ダウンロード）                                             */
+  /* 書き出し（Markdown / HTML / Movable Type / WordPress WXR）           */
   /* ------------------------------------------------------------------ */
 
-  async function doExport() {
+  const STORAGE_EXPORT_FORMAT = 'ribbon:export-format';
+
+  function escapeXml(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function formatMtDate(ts) {
+    const d = new Date(ts);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(d.getMonth() + 1)}/${pad(d.getDate())}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function formatWpDate(ts) {
+    const d = new Date(ts);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  }
+
+  function slugify(text) {
+    return (text || 'memo').toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]/g, '').slice(0, 80) || 'memo';
+  }
+
+  const EXPORT_FORMATS = {
+    md: {
+      ext: 'md',
+      mime: 'text/markdown;charset=utf-8',
+      description: 'Markdown',
+      accept: { 'text/markdown': ['.md'] },
+      build({ title, markdown }) { return markdown; },
+    },
+    html: {
+      ext: 'html',
+      mime: 'text/html;charset=utf-8',
+      description: 'HTML',
+      accept: { 'text/html': ['.html'] },
+      build({ title, markdown }) {
+        const body = DOMPurify.sanitize(marked.parse(markdown));
+        return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title)}</title>
+<style>
+  body { font-family: Georgia, serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; line-height: 1.8; color: #2B2D31; }
+  h1, h2, h3 { font-weight: 600; line-height: 1.3; margin: 1.2em 0 0.5em; }
+  h1 { font-size: 1.6em; border-bottom: 2px solid #B3402C; padding-bottom: 0.25em; }
+  h2 { font-size: 1.3em; border-bottom: 1px solid #CFD6DE; padding-bottom: 0.2em; }
+  a { color: #B3402C; }
+  blockquote { margin: 1em 0; padding: 4px 14px; border-left: 3px solid #B3402C; background: #F4F6F9; font-style: italic; }
+  code { font-family: ui-monospace, monospace; background: #CFD6DE; padding: 0.15em 0.4em; border-radius: 3px; font-size: 0.85em; }
+  pre { background: #1F2124; color: #ECE9E2; padding: 14px; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+  th, td { border: 1px solid #CFD6DE; padding: 6px 8px; }
+  img { max-width: 100%; border-radius: 6px; }
+</style>
+</head>
+<body>
+${body}
+</body>
+</html>`;
+      },
+    },
+    mt: {
+      ext: 'txt',
+      mime: 'text/plain;charset=utf-8',
+      description: 'Movable Type',
+      accept: { 'text/plain': ['.txt'] },
+      build({ title, markdown, updatedAt }) {
+        return `AUTHOR:
+TITLE: ${title}
+DATE: ${formatMtDate(updatedAt)}
+-----
+${markdown}
+-----
+`;
+      },
+    },
+    wordpress: {
+      ext: 'xml',
+      mime: 'application/xml;charset=utf-8',
+      description: 'WordPress WXR',
+      accept: { 'application/xml': ['.xml'] },
+      build({ title, markdown, updatedAt, id }) {
+        const html = DOMPurify.sanitize(marked.parse(markdown));
+        const postDate = formatWpDate(updatedAt);
+        const pubDate = new Date(updatedAt).toUTCString();
+        const slug = slugify(title);
+        return `<?xml version="1.0" encoding="UTF-8" ?>
+<!-- WordPress eXtended RSS file generated by Ribbon -->
+<rss version="2.0"
+  xmlns:excerpt="http://wordpress.org/export/1.2/excerpt/"
+  xmlns:content="http://purl.org/rss/1.0/modules/content/"
+  xmlns:wfw="http://wellformedweb.org/CommentAPI/"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:wp="http://wordpress.org/export/1.2/"
+>
+<channel>
+  <title>Ribbon Export</title>
+  <link></link>
+  <description></description>
+  <pubDate>${pubDate}</pubDate>
+  <language>ja</language>
+  <wp:wxr_version>1.2</wp:wxr_version>
+  <item>
+    <title>${escapeXml(title)}</title>
+    <link></link>
+    <pubDate>${pubDate}</pubDate>
+    <dc:creator><![CDATA[]]></dc:creator>
+    <guid isPermaLink="false">ribbon-${escapeXml(id)}</guid>
+    <description></description>
+    <content:encoded><![CDATA[${html}]]></content:encoded>
+    <excerpt:encoded><![CDATA[]]></excerpt:encoded>
+    <wp:post_id>1</wp:post_id>
+    <wp:post_date><![CDATA[${postDate}]]></wp:post_date>
+    <wp:post_date_gmt><![CDATA[${postDate}]]></wp:post_date_gmt>
+    <wp:post_modified><![CDATA[${postDate}]]></wp:post_modified>
+    <wp:post_modified_gmt><![CDATA[${postDate}]]></wp:post_modified_gmt>
+    <wp:comment_status><![CDATA[open]]></wp:comment_status>
+    <wp:ping_status><![CDATA[open]]></wp:ping_status>
+    <wp:post_name><![CDATA[${slug}]]></wp:post_name>
+    <wp:status><![CDATA[draft]]></wp:status>
+    <wp:post_parent>0</wp:post_parent>
+    <wp:menu_order>0</wp:menu_order>
+    <wp:post_type><![CDATA[post]]></wp:post_type>
+    <wp:post_password><![CDATA[]]></wp:post_password>
+    <wp:is_sticky>0</wp:is_sticky>
+  </item>
+</channel>
+</rss>`;
+      },
+    },
+  };
+
+  function getExportFormat() {
+    const saved = localStorage.getItem(STORAGE_EXPORT_FORMAT);
+    return EXPORT_FORMATS[saved] ? saved : 'md';
+  }
+
+  function setExportFormat(format) {
+    if (EXPORT_FORMATS[format]) localStorage.setItem(STORAGE_EXPORT_FORMAT, format);
+  }
+
+  function renderExportFormatSelection() {
+    const current = getExportFormat();
+    $$('.export-format-btn').forEach((btn) => {
+      btn.classList.toggle('selected', btn.dataset.format === current);
+    });
+  }
+
+  function openExportSheet() {
+    renderExportFormatSelection();
+    exportSheet.classList.add('open');
+    exportOverlay.classList.add('open');
+  }
+
+  function closeExportSheet() {
+    exportSheet.classList.remove('open');
+    exportOverlay.classList.remove('open');
+  }
+
+  async function downloadExport(formatKey) {
     doSave();
-    const filename = (currentNote.title || 'memo').replace(/[\\/:*?"<>|]/g, '_') + '.md';
-    const content = editorEl.value;
+    const format = EXPORT_FORMATS[formatKey];
+    if (!format) return;
+
+    const title = currentNote.title || 'memo';
+    const safeName = title.replace(/[\\/:*?"<>|]/g, '_');
+    const filename = `${safeName}.${format.ext}`;
+    const content = format.build({
+      title,
+      markdown: editorEl.value,
+      updatedAt: currentNote.updatedAt,
+      id: currentNote.id,
+    });
+
     if (window.showSaveFilePicker) {
       try {
         const handle = await window.showSaveFilePicker({
           suggestedName: filename,
-          types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }],
+          types: [{ description: format.description, accept: format.accept }],
         });
         const writable = await handle.createWritable();
         await writable.write(content);
@@ -976,7 +1181,8 @@
         if (err.name === 'AbortError') return;
       }
     }
-    const blob = new Blob([content], { type: 'text/markdown;charset=utf-8' });
+
+    const blob = new Blob([content], { type: format.mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -987,7 +1193,18 @@
     URL.revokeObjectURL(url);
     toast('ダウンロードしました');
   }
-  $('#saveBtn').addEventListener('click', doExport);
+
+  exportOverlay.addEventListener('click', closeExportSheet);
+  exportFormatsEl.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.export-format-btn');
+    if (!btn) return;
+    const formatKey = btn.dataset.format;
+    setExportFormat(formatKey);
+    closeExportSheet();
+    await downloadExport(formatKey);
+  });
+
+  $('#saveBtn').addEventListener('click', openExportSheet);
 
   /* ------------------------------------------------------------------ */
   /* PWA install                                                          */
@@ -1013,9 +1230,11 @@
   });
 
   if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
+    const registerSw = () => {
       navigator.serviceWorker.register(new URL('sw.js', document.baseURI).href).catch(() => {});
-    });
+    };
+    if (document.readyState === 'complete') registerSw();
+    else window.addEventListener('load', registerSw);
   }
 
   /* ------------------------------------------------------------------ */

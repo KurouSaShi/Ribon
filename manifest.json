@@ -12,6 +12,7 @@
   "theme_color": "#1f2124",
   "lang": "ja",
   "dir": "ltr",
+  "prefer_related_applications": false,
   "categories": ["productivity", "utilities"],
   "icons": [
     {

@@ -147,6 +147,19 @@
   <div class="sheet-overlay" id="pressOverlay"></div>
 
   <!-- メモ一覧（ボトムシート） -->
+  <!-- 書き出し形式の選択 -->
+  <div class="sheet-overlay" id="exportOverlay"></div>
+  <div class="bottom-sheet export-sheet" id="exportSheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-list-header">書き出し形式</div>
+    <ul class="export-formats" id="exportFormats">
+      <li><button type="button" class="export-format-btn" data-format="md">Markdown (.md)</button></li>
+      <li><button type="button" class="export-format-btn" data-format="html">HTML (.html)</button></li>
+      <li><button type="button" class="export-format-btn" data-format="mt">Movable Type</button></li>
+      <li><button type="button" class="export-format-btn" data-format="wordpress">WordPress (XML)</button></li>
+    </ul>
+  </div>
+
   <div class="sheet-overlay" id="sheetOverlay"></div>
   <div class="bottom-sheet" id="listSheet">
     <div class="sheet-handle"></div>

@@ -2,7 +2,7 @@
    Caches the app shell so the editor keeps working offline once installed.
    Bump CACHE_VERSION whenever a shipped asset changes. */
 
-const CACHE_VERSION = 'ribbon-v4';
+const CACHE_VERSION = 'ribbon-v5';
 const SCOPE_URL = new URL(self.registration.scope);
 
 const APP_SHELL = [
@@ -20,6 +20,8 @@ const APP_SHELL = [
   'icons/favicon-64.png',
 ].map((p) => new URL(p, SCOPE_URL).toString());
 
+const OFFLINE_URL = new URL('index.html', SCOPE_URL).toString();
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting())
@@ -34,14 +36,28 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+async function cacheFirst(request) {
+  const cached = await caches.match(request);
+  if (cached) return cached;
+  try {
+    const res = await fetch(request);
+    if (res && res.status === 200) {
+      const copy = res.clone();
+      caches.open(CACHE_VERSION).then((cache) => cache.put(request, copy));
+    }
+    return res;
+  } catch {
+    return caches.match(request);
+  }
+}
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
 
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return; // let Google Fonts etc. go straight to network
+  if (url.origin !== self.location.origin) return;
 
-  // Navigations: try network first so updates show up, fall back to cached shell offline.
   if (req.mode === 'navigate') {
     event.respondWith(
       fetch(req)
@@ -50,24 +66,10 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
           return res;
         })
-        .catch(() => caches.match(new URL('index.html', SCOPE_URL).toString()))
+        .catch(() => caches.match(OFFLINE_URL))
     );
     return;
   }
 
-  // Static assets: cache-first, refresh in background.
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      const network = fetch(req)
-        .then((res) => {
-          if (res && res.status === 200) {
-            const copy = res.clone();
-            caches.open(CACHE_VERSION).then((cache) => cache.put(req, copy));
-          }
-          return res;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
-  );
+  event.respondWith(cacheFirst(req));
 });

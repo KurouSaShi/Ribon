@@ -18,6 +18,7 @@
 
   --toolbar-h: 86px;
   --toolbar-row-h: 34px;
+  --toolbar-bottom: 0px;
 
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
@@ -128,7 +129,13 @@ textarea { font-size: 16px; /* iOSの自動ズーム防止 */ }
   transition: transform 0.2s ease;
 }
 
-.workspace { flex: 1 1 auto; min-height: 0; position: relative; }
+.workspace {
+  flex: 1 1 auto;
+  min-height: 0;
+  position: relative;
+  padding-bottom: calc(var(--toolbar-h) + var(--sab));
+}
+.app[data-view="preview"] .workspace { padding-bottom: 0; }
 .pane { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; }
 .pane-editor { background: var(--graphite); color: var(--text-on-graphite); }
 .pane-preview { background: var(--paper); color: var(--ink); }
@@ -205,13 +212,22 @@ textarea { font-size: 16px; /* iOSの自動ズーム防止 */ }
 /* ---------------- 記法ショートカットバー（キーボード直上） ---------------- */
 
 .format-toolbar {
-  flex: 0 0 auto;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: var(--toolbar-bottom, 0px);
+  z-index: 20;
+  width: 100%;
+  max-width: 480px;
   display: flex;
   align-items: stretch;
   height: calc(var(--toolbar-h) + var(--sab));
   padding-bottom: var(--sab);
+  padding-left: var(--sal);
+  padding-right: var(--sar);
   background: var(--graphite);
   border-top: 1px solid #000;
+  transition: bottom 0.08s ease-out;
 }
 .app[data-view="preview"] .format-toolbar { display: none; }
 
@@ -359,7 +375,7 @@ button.ft-stat:active, button.ft-stat.pressed { background: rgba(255,255,255,0.1
 .table-panel {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--toolbar-h) + var(--sab) + 10px);
+  bottom: calc(var(--toolbar-bottom, 0px) + var(--toolbar-h) + var(--sab) + 10px);
   transform: translateX(-50%);
   display: none;
   flex-direction: column;
@@ -523,12 +539,34 @@ button.ft-stat:active, button.ft-stat.pressed { background: rgba(255,255,255,0.1
 .note-item .ni-del:active { color: var(--ribbon); }
 .note-empty { padding: 20px 12px; text-align: center; color: var(--chrome-muted); font-size: 12px; }
 
+/* ---------------- 書き出し形式 ---------------- */
+
+.export-sheet { max-height: 52vh; }
+.export-formats {
+  list-style: none;
+  margin: 0;
+  padding: 4px 8px 12px;
+}
+.export-format-btn {
+  width: 100%;
+  display: block;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--chrome-text);
+  font-size: 14px;
+  padding: 13px 12px;
+  border-radius: 8px;
+}
+.export-format-btn:active,
+.export-format-btn.selected { background: var(--paper-2); color: var(--ribbon); font-weight: 600; }
+
 /* ---------------- トースト ---------------- */
 
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(20px + var(--sab));
+  bottom: calc(var(--toolbar-bottom, 0px) + var(--toolbar-h) + 20px + var(--sab));
   transform: translateX(-50%) translateY(12px);
   background: var(--graphite);
   color: var(--text-on-graphite);
@@ -542,5 +580,9 @@ button.ft-stat:active, button.ft-stat.pressed { background: rgba(255,255,255,0.1
   z-index: 50;
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.app[data-view="preview"] .toast {
+  bottom: calc(20px + var(--sab));
+}
 
 :focus-visible { outline: 2px solid var(--ribbon); }
