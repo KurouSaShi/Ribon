@@ -1,4 +1,6 @@
 :root {
+  --editor-font-size: 16px;
+  --app-max-width: 480px;
   --graphite: #1F2124;
   --paper: #EAEEF3;
   --paper-dark: #CFD6DE;
@@ -16,9 +18,8 @@
   --chrome-muted: #767c85;
   --shadow: 0 8px 24px -12px rgba(20,20,22,0.35);
 
-  --toolbar-h: 86px;
+  --toolbar-h: 104px;
   --toolbar-row-h: 34px;
-  --toolbar-bottom: 0px;
 
   --sat: env(safe-area-inset-top, 0px);
   --sab: env(safe-area-inset-bottom, 0px);
@@ -29,12 +30,23 @@
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; margin: 0; overscroll-behavior: none; }
 
+/* iOS/Androidでソフトキーボードが開いたときにレイアウトビューポートと
+   視覚ビューポートがズレて隙間ができたり、本文末尾がキーボードや
+   ツールバーの裏に隠れたりするのを防ぐため、ページ自体はスクロール
+   させず、高さは JS (visualViewport) が --vh に同期した値を使う。 */
 body {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  overflow: hidden;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   background: #0d0e10;
   color: var(--chrome-text);
   display: flex;
   justify-content: center;
+  height: 100vh;
+  height: 100dvh;
+  height: var(--vh, 100dvh);
 }
 
 .hidden { display: none !important; }
@@ -46,9 +58,8 @@ textarea { font-size: 16px; /* iOSの自動ズーム防止 */ }
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 480px;
-  height: 100dvh;
-  height: 100vh;
+  max-width: var(--app-max-width);
+  height: 100%;
   background: var(--chrome-bg);
   position: relative;
   overflow: hidden;
@@ -129,20 +140,42 @@ textarea { font-size: 16px; /* iOSの自動ズーム防止 */ }
   transition: transform 0.2s ease;
 }
 
-.workspace {
-  flex: 1 1 auto;
-  min-height: 0;
-  position: relative;
-  padding-bottom: calc(var(--toolbar-h) + var(--sab));
-}
-.app[data-view="preview"] .workspace { padding-bottom: 0; }
+.workspace { flex: 1 1 auto; min-height: 0; position: relative; }
 .pane { position: absolute; inset: 0; display: flex; flex-direction: column; overflow: hidden; }
 .pane-editor { background: var(--graphite); color: var(--text-on-graphite); }
 .pane-preview { background: var(--paper); color: var(--ink); }
 .workspace[data-view="edit"] .pane-preview { display: none; }
 .workspace[data-view="preview"] .pane-editor { display: none; }
 
+.editor-stack {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.editor-highlight {
+  display: none;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: inherit;
+  font-size: var(--editor-font-size, 16px);
+  line-height: 1.75;
+  padding: 18px 16px 28px;
+  color: var(--text-on-graphite);
+}
+.editor-stack.hl-active .editor-highlight { display: block; }
+.editor-highlight .hl-mark {
+  color: var(--ribbon-light);
+  font-weight: 700;
+}
+
 .editor {
+  position: absolute;
+  inset: 0;
   flex: 1 1 auto;
   width: 100%;
   height: 100%;
@@ -152,11 +185,12 @@ textarea { font-size: 16px; /* iOSの自動ズーム防止 */ }
   background: transparent;
   color: inherit;
   font-family: inherit;
-  font-size: 15.5px;
+  font-size: var(--editor-font-size, 16px);
   line-height: 1.75;
-  padding: 18px 16px;
+  padding: 18px 16px 28px;
   caret-color: var(--ribbon-light);
 }
+.editor-stack.hl-active .editor { color: transparent; }
 .editor::placeholder { color: var(--muted-on-graphite); }
 
 .preview {
@@ -164,7 +198,7 @@ textarea { font-size: 16px; /* iOSの自動ズーム防止 */ }
   overflow-y: auto;
   padding: 22px 18px calc(28px + var(--sab));
   font-family: Georgia, serif;
-  font-size: 16px;
+  font-size: var(--editor-font-size, 16px);
   line-height: 1.8;
 }
 
@@ -212,24 +246,31 @@ textarea { font-size: 16px; /* iOSの自動ズーム防止 */ }
 /* ---------------- 記法ショートカットバー（キーボード直上） ---------------- */
 
 .format-toolbar {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: var(--toolbar-bottom, 0px);
-  z-index: 20;
-  width: 100%;
-  max-width: 480px;
+  flex: 0 0 auto;
   display: flex;
-  align-items: stretch;
+  flex-direction: column;
   height: calc(var(--toolbar-h) + var(--sab));
   padding-bottom: var(--sab);
-  padding-left: var(--sal);
-  padding-right: var(--sar);
   background: var(--graphite);
   border-top: 1px solid #000;
-  transition: bottom 0.08s ease-out;
 }
 .app[data-view="preview"] .format-toolbar { display: none; }
+
+.ft-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 22px;
+  padding: 3px 8px 2px;
+}
+
+.ft-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: stretch;
+}
 
 .ft-fixed {
   flex: 0 0 auto;
@@ -242,7 +283,7 @@ textarea { font-size: 16px; /* iOSの自動ズーム防止 */ }
   z-index: 2;
 }
 .ft-fixed-left { border-right: 1px solid #000; box-shadow: 4px 0 8px -4px rgba(0,0,0,0.35); width: 76px; }
-.ft-fixed-right { border-left: 1px solid #000; box-shadow: -4px 0 8px -4px rgba(0,0,0,0.35); width: 92px; }
+.ft-fixed-right { border-left: 1px solid #000; box-shadow: -4px 0 8px -4px rgba(0,0,0,0.35); }
 
 .ft-fixed-row {
   flex: 0 0 auto;
@@ -294,6 +335,11 @@ textarea { font-size: 16px; /* iOSの自動ズーム防止 */ }
   touch-action: pan-x;
 }
 .fbtn:active, .fbtn.pressed { background: rgba(255,255,255,0.12); }
+.fbtn.armed {
+  background: var(--ribbon);
+  color: #fff;
+  box-shadow: 0 0 0 1px var(--ribbon-light) inset;
+}
 .fbtn-h { font-weight: 700; position: relative; }
 .fbtn-h::after {
   content: '';
@@ -308,28 +354,25 @@ textarea { font-size: 16px; /* iOSの自動ズーム防止 */ }
 }
 .fdiv { flex: 0 0 auto; width: 1px; height: 20px; background: rgba(255,255,255,0.16); margin: 0 2px; }
 
-#moveLeftBtn, #moveRightBtn, #cursorLeftBtn, #cursorRightBtn { font-size: 15px; font-weight: 600; color: var(--ribbon-light); touch-action: manipulation; }
+#cursorLeftBtn, #cursorRightBtn { font-size: 15px; font-weight: 600; color: var(--ribbon-light); touch-action: manipulation; }
 
 /* ---------------- 文字数・語数・見出し数の表示（キーボード左上） ---------------- */
 
 .ft-stat {
-  flex: 1 1 0;
-  height: var(--toolbar-row-h);
+  flex: 0 0 auto;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 3px;
+  padding: 0 7px;
   border: none;
   border-radius: 5px;
   background: rgba(255,255,255,0.06);
   color: var(--text-on-graphite);
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.1px;
+  letter-spacing: 0.2px;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
   touch-action: manipulation;
 }
 button.ft-stat:active, button.ft-stat.pressed { background: rgba(255,255,255,0.14); }
@@ -375,7 +418,7 @@ button.ft-stat:active, button.ft-stat.pressed { background: rgba(255,255,255,0.1
 .table-panel {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--toolbar-bottom, 0px) + var(--toolbar-h) + var(--sab) + 10px);
+  bottom: calc(var(--toolbar-h) + var(--sab) + 10px);
   transform: translateX(-50%);
   display: none;
   flex-direction: column;
@@ -461,7 +504,7 @@ button.ft-stat:active, button.ft-stat.pressed { background: rgba(255,255,255,0.1
   left: 50%;
   bottom: 0;
   width: 100%;
-  max-width: 480px;
+  max-width: var(--app-max-width);
   max-height: 78vh;
   background: var(--chrome-bg-2);
   border-radius: 18px 18px 0 0;
@@ -501,7 +544,144 @@ button.ft-stat:active, button.ft-stat.pressed { background: rgba(255,255,255,0.1
   letter-spacing: 0.3px;
   border-top: 1px solid var(--chrome-border);
   padding-top: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
+.sheet-header-btn {
+  border: none;
+  background: none;
+  color: var(--ribbon);
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 6px;
+}
+.sheet-header-btn:active { opacity: 0.6; }
+
+.sheet-divider {
+  height: 0;
+  flex: 0 0 auto;
+}
+
+/* ---------------- 表示設定（文字サイズ／ハイライト） ---------------- */
+
+.settings-row {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 16px;
+}
+.settings-toggle-row { cursor: pointer; }
+.settings-label {
+  font-size: 12.5px;
+  color: var(--chrome-text);
+  line-height: 1.4;
+}
+.settings-stepper {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.settings-stepper span { min-width: 42px; text-align: center; font-size: 13px; font-weight: 600; }
+.settings-step {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid var(--chrome-border);
+  background: var(--chrome-bg);
+  color: var(--ribbon);
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.settings-step:active { background: var(--ribbon); color: #fff; }
+.settings-switch { position: relative; display: inline-block; width: 40px; height: 24px; flex: 0 0 auto; }
+.settings-switch input { opacity: 0; width: 0; height: 0; }
+.settings-slider {
+  position: absolute; inset: 0;
+  background: var(--chrome-border);
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+.settings-slider::before {
+  content: '';
+  position: absolute;
+  width: 18px; height: 18px;
+  left: 3px; top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.settings-switch input:checked + .settings-slider { background: var(--ribbon); }
+.settings-switch input:checked + .settings-slider::before { transform: translateX(16px); }
+
+.plugin-warning {
+  margin: 2px 16px 8px;
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--chrome-muted);
+}
+
+.plugin-items {
+  list-style: none;
+  margin: 0;
+  padding: 4px 8px 14px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.plugin-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 8px;
+  border-radius: 8px;
+}
+.plugin-item:active { background: var(--chrome-bg); }
+.plugin-item .pi-text { flex: 1 1 auto; min-width: 0; }
+.plugin-item .pi-name {
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plugin-item .pi-meta { font-size: 10.5px; color: var(--chrome-muted); margin-top: 2px; }
+.plugin-item .pi-switch { position: relative; display: inline-block; width: 36px; height: 21px; flex: 0 0 auto; }
+.plugin-item .pi-switch input { opacity: 0; width: 0; height: 0; }
+.plugin-item .pi-slider {
+  position: absolute; inset: 0;
+  background: var(--chrome-border);
+  border-radius: 999px;
+  transition: background 0.15s ease;
+}
+.plugin-item .pi-slider::before {
+  content: '';
+  position: absolute;
+  width: 15px; height: 15px;
+  left: 3px; top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.15s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+}
+.plugin-item .pi-switch input:checked + .pi-slider { background: var(--ribbon); }
+.plugin-item .pi-switch input:checked + .pi-slider::before { transform: translateX(15px); }
+.plugin-item .pi-del {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  color: var(--chrome-muted);
+  font-size: 15px;
+  padding: 6px;
+  border-radius: 3px;
+}
+.plugin-item .pi-del:active { color: var(--ribbon); }
+.plugin-item.pi-error .pi-name { color: var(--ribbon); }
+.plugin-empty { padding: 14px 12px 6px; text-align: center; color: var(--chrome-muted); font-size: 12px; }
 
 .note-items {
   list-style: none;
@@ -539,34 +719,12 @@ button.ft-stat:active, button.ft-stat.pressed { background: rgba(255,255,255,0.1
 .note-item .ni-del:active { color: var(--ribbon); }
 .note-empty { padding: 20px 12px; text-align: center; color: var(--chrome-muted); font-size: 12px; }
 
-/* ---------------- 書き出し形式 ---------------- */
-
-.export-sheet { max-height: 52vh; }
-.export-formats {
-  list-style: none;
-  margin: 0;
-  padding: 4px 8px 12px;
-}
-.export-format-btn {
-  width: 100%;
-  display: block;
-  text-align: left;
-  border: none;
-  background: transparent;
-  color: var(--chrome-text);
-  font-size: 14px;
-  padding: 13px 12px;
-  border-radius: 8px;
-}
-.export-format-btn:active,
-.export-format-btn.selected { background: var(--paper-2); color: var(--ribbon); font-weight: 600; }
-
 /* ---------------- トースト ---------------- */
 
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--toolbar-bottom, 0px) + var(--toolbar-h) + 20px + var(--sab));
+  bottom: calc(20px + var(--sab));
   transform: translateX(-50%) translateY(12px);
   background: var(--graphite);
   color: var(--text-on-graphite);
@@ -581,8 +739,26 @@ button.ft-stat:active, button.ft-stat.pressed { background: rgba(255,255,255,0.1
 }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-.app[data-view="preview"] .toast {
-  bottom: calc(20px + var(--sab));
+:focus-visible { outline: 2px solid var(--ribbon); }
+
+/* ---------------- タブレット対応 ---------------- */
+/* スマホ専用の1カラム構成は維持しつつ、画面が広い端末では中央の
+   カラム自体を広げ、細長い帯にならないようにする。 */
+
+@media (min-width: 600px) {
+  :root { --app-max-width: 640px; }
+  .doc-title, .brand-tag { display: inline; }
+  .fbtn { min-width: 40px; }
 }
 
-:focus-visible { outline: 2px solid var(--ribbon); }
+@media (min-width: 900px) {
+  :root { --app-max-width: 760px; --editor-font-size: 17px; }
+  .topbar { padding-left: calc(var(--sat) + 4px); }
+  .ft-scroll { padding: 0 12px; }
+}
+
+@media (min-width: 600px) and (orientation: landscape) {
+  /* 横向きタブレットはキーボードが縦向きより高さを取るため、
+     アクセサリーバーの行の高さを少し詰めて編集領域を確保する。 */
+  :root { --toolbar-row-h: 32px; }
+}
