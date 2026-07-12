@@ -15,8 +15,13 @@ import { toast } from './toast.js';
 
 function syncAppHeight() {
   const vv = window.visualViewport;
-  if (!vv) { appEl.style.height = ''; return; }
+  if (!vv) { appEl.style.height = ''; appEl.style.transform = ''; return; }
   appEl.style.height = `${vv.height}px`;
+  // ホーム画面に追加したPWA(standalone)では、キーボード表示中に
+  // visualViewport.offsetTop がリセットされずズレたままになる既知のWebKitの
+  // 不具合がある。height だけ合わせても、この分のズレが黒い隙間として
+  // 残ってしまうため、offsetTop 分を transform で打ち消す。
+  appEl.style.transform = vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
 }
 
 export function initKeyboardFix() {
