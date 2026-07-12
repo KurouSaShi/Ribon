@@ -123,6 +123,7 @@ function applyHistoryState(state) {
   notifyChange();
   updateHistoryButtons();
   updateStats();
+  scheduleCenterCaret();
 }
 
 export function undo() {
@@ -145,6 +146,77 @@ editorEl.addEventListener('input', () => {
   scheduleRender();
   scheduleHistoryPush();
   updateStats();
+});
+
+/* ------------------------------------------------------------------ */
+/* 入力位置（キャレット）を常に編集欄の縦方向中央あたりに保つ              */
+/* textarea はキャレットの画面座標をブラウザ標準では取得できないため、    */
+/* 同じフォント・余白で複製した非表示の「鏡」要素にテキストを流し込み、   */
+/* その中でのキャレット位置（＝行の高さ）を計測してスクロール量を決める。 */
+/* ------------------------------------------------------------------ */
+
+let caretMirrorEl = null;
+function getCaretMirror() {
+  if (caretMirrorEl) return caretMirrorEl;
+  caretMirrorEl = document.createElement('div');
+  const s = caretMirrorEl.style;
+  s.position = 'fixed';
+  s.visibility = 'hidden';
+  s.top = '0';
+  s.left = '-9999px';
+  s.whiteSpace = 'pre-wrap';
+  s.wordWrap = 'break-word';
+  s.overflowWrap = 'break-word';
+  document.body.appendChild(caretMirrorEl);
+  return caretMirrorEl;
+}
+
+const MIRROR_PROPS = [
+  'boxSizing', 'width', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+  'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+  'fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'lineHeight', 'letterSpacing', 'textIndent',
+];
+
+function getCaretOffsetTop(pos) {
+  const mirror = getCaretMirror();
+  const computed = window.getComputedStyle(editorEl);
+  MIRROR_PROPS.forEach((p) => { mirror.style[p] = computed[p]; });
+  mirror.style.height = 'auto';
+  mirror.textContent = editorEl.value.slice(0, pos);
+  const marker = document.createElement('span');
+  marker.textContent = '\u200b'; // ゼロ幅：行の高さだけ計測できればよい
+  mirror.appendChild(marker);
+  const top = marker.offsetTop;
+  mirror.removeChild(marker);
+  return top;
+}
+
+function centerCaret() {
+  const el = editorEl;
+  if (document.activeElement !== el) return; // フォーカスしていない間は動かさない
+  if (el.selectionStart !== el.selectionEnd) return; // 範囲選択中は動かさない
+  const caretTop = getCaretOffsetTop(el.selectionStart);
+  const lineHeight = parseFloat(window.getComputedStyle(el).lineHeight) || 24;
+  const caretCenter = caretTop + lineHeight / 2;
+  const target = Math.max(0, Math.min(el.scrollHeight - el.clientHeight, caretCenter - el.clientHeight / 2));
+  el.scrollTop = target;
+}
+
+let centerCaretFrame = null;
+export function scheduleCenterCaret() {
+  if (centerCaretFrame) cancelAnimationFrame(centerCaretFrame);
+  centerCaretFrame = requestAnimationFrame(() => {
+    centerCaretFrame = null;
+    centerCaret();
+  });
+}
+
+editorEl.addEventListener('input', scheduleCenterCaret);
+editorEl.addEventListener('click', scheduleCenterCaret);
+editorEl.addEventListener('touchend', scheduleCenterCaret);
+editorEl.addEventListener('keyup', (e) => {
+  const navKeys = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown'];
+  if (navKeys.includes(e.key)) scheduleCenterCaret();
 });
 
 /* ------------------------------------------------------------------ */
@@ -231,6 +303,7 @@ export function moveCursor(delta) {
   }
   pos = Math.max(0, Math.min(el.value.length, pos));
   el.setSelectionRange(pos, pos);
+  scheduleCenterCaret();
 }
 
 // 押すたびに現在位置から1文字ずつ選択範囲を広げる。
@@ -252,6 +325,7 @@ export function extendSelection(delta) {
     dir = 'forward';
   }
   el.setSelectionRange(s, e, dir);
+  scheduleCenterCaret();
 }
 
 /* ------------------------------------------------------------------ */
@@ -264,6 +338,7 @@ export function getSelection() {
 export function setSelection(start, end) {
   editorEl.focus();
   editorEl.setSelectionRange(start, end);
+  scheduleCenterCaret();
 }
 export function replaceRange(start, end, text) {
   const { value } = getSelection();
