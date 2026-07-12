@@ -1,8 +1,29 @@
 // viewport.js — 編集／プレビュー タブの切り替え、ソフトキーボード対応、
 // PWAのインストールと Service Worker 登録をまとめたモジュール。
 
-import { appEl, editorEl, previewEl, workspaceEl, tabIndicator, tabButtons, installBtn } from './dom.js';
+import { appEl, editorEl, previewEl, workspaceEl, tabIndicator, tabButtons, installBtn, formatToolbarEl } from './dom.js';
 import { toast } from './toast.js';
+
+/* ------------------------------------------------------------------ */
+/* ツールバーの実際の高さを --toolbar-h に反映する                        */
+/* 以前は3段ぶんの高さを常に確保していたため、プラグイン行が無いときに      */
+/* 空白の3段目のような隙間ができていた。ResizeObserverで実寸を測って       */
+/* 反映することで、2段／3段どちらでも隙間なくフィットさせる。              */
+/* ------------------------------------------------------------------ */
+
+export function initToolbarHeight() {
+  if (!formatToolbarEl) return;
+  const sync = () => {
+    const h = formatToolbarEl.getBoundingClientRect().height;
+    if (h > 0) document.documentElement.style.setProperty('--toolbar-h', `${h}px`);
+  };
+  sync();
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(sync).observe(formatToolbarEl);
+  } else {
+    window.addEventListener('resize', sync);
+  }
+}
 
 /* ------------------------------------------------------------------ */
 /* ソフトキーボード対応                                                  */
