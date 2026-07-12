@@ -171,12 +171,25 @@ editorEl.addEventListener('keydown', (e) => {
   const olMatch = beforeCursor.match(olLineRe);
   if (!ulMatch && !olMatch) return; // 箇条書き／番号付きリストの行でなければ既定動作
 
+  // 直前の行も同じ種類・同じ字下げの「空の」リスト項目かどうか
+  // （＝これが2回目の空Enterかどうか）を調べる。
+  function prevLineIsEmptySameList(indent, isUl) {
+    if (lineStart === 0) return false;
+    const prevLineEnd = lineStart - 1;
+    const prevLineStart = value.lastIndexOf('\n', prevLineEnd - 1) + 1;
+    const prevLine = value.slice(prevLineStart, prevLineEnd);
+    const m = prevLine.match(isUl ? ulLineRe : olLineRe);
+    if (!m) return false;
+    const prevContent = isUl ? m[2] : m[3];
+    return m[1] === indent && prevContent.trim() === '';
+  }
+
   e.preventDefault();
 
   if (ulMatch) {
     const [, indent, content] = ulMatch;
-    if (content.trim() === '') {
-      // 空の項目でEnter：マーカーを取り除いてリストから抜ける
+    if (content.trim() === '' && prevLineIsEmptySameList(indent, true)) {
+      // 2回連続で空の項目にEnter：マーカーを取り除いてリストから抜ける
       replaceRange(lineStart, pos, indent);
       const cursorPos = lineStart + indent.length;
       setSelection(cursorPos, cursorPos);
@@ -190,13 +203,13 @@ editorEl.addEventListener('keydown', (e) => {
   }
 
   const [, indent, num, content] = olMatch;
-  if (content.trim() === '') {
+  const nextNum = parseInt(num, 10) + 1;
+  if (content.trim() === '' && prevLineIsEmptySameList(indent, false)) {
     replaceRange(lineStart, pos, indent);
     const cursorPos = lineStart + indent.length;
     setSelection(cursorPos, cursorPos);
     return;
   }
-  const nextNum = parseInt(num, 10) + 1;
   const insertText = '\n' + indent + nextNum + '. ';
   replaceRange(pos, pos, insertText);
   const cursorPos = pos + insertText.length;
