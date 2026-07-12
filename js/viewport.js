@@ -36,13 +36,8 @@ export function initToolbarHeight() {
 
 function syncAppHeight() {
   const vv = window.visualViewport;
-  if (!vv) { appEl.style.height = ''; appEl.style.transform = ''; return; }
+  if (!vv) { appEl.style.height = ''; return; }
   appEl.style.height = `${vv.height}px`;
-  // ホーム画面に追加したPWA(standalone)では、キーボード表示中に
-  // visualViewport.offsetTop がリセットされずズレたままになる既知のWebKitの
-  // 不具合がある。height だけ合わせても、この分のズレが黒い隙間として
-  // 残ってしまうため、offsetTop 分を transform で打ち消す。
-  appEl.style.transform = vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
 }
 
 export function initKeyboardFix() {
@@ -50,18 +45,6 @@ export function initKeyboardFix() {
   syncAppHeight();
   window.visualViewport.addEventListener('resize', syncAppHeight);
   window.visualViewport.addEventListener('scroll', syncAppHeight);
-
-  // ホーム画面に追加したPWA(standalone)では、キーボード表示時に上記の
-  // resize/scroll イベントが発火しない・遅れることがある既知のWebKitの
-  // 不具合があり、それが起きると .app が縮まずツールバーがキーボードの
-  // 下（画面最下部）に取り残される。テキストエリアのフォーカス変化に
-  // 合わせて、キーボードのアニメーションが終わる頃まで数回リトライする。
-  const retrySync = () => {
-    syncAppHeight();
-    [50, 150, 300, 500].forEach((ms) => setTimeout(syncAppHeight, ms));
-  };
-  editorEl.addEventListener('focus', retrySync);
-  editorEl.addEventListener('blur', retrySync);
 }
 
 /* ------------------------------------------------------------------ */
