@@ -47,6 +47,7 @@ export const pluginFileInput = $('#pluginFileInput');
 export const installBtn = $('#installBtn');
 
 export const ftRowsEl = $('.ft-rows');
+export const formatToolbarEl = $('#formatToolbar');
 
 export const editorStackEl = $('.editor-stack');
 export const editorHighlightEl = $('#editorHighlight');
