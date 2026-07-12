@@ -50,6 +50,18 @@ export function initKeyboardFix() {
   syncAppHeight();
   window.visualViewport.addEventListener('resize', syncAppHeight);
   window.visualViewport.addEventListener('scroll', syncAppHeight);
+
+  // ホーム画面に追加したPWA(standalone)では、キーボード表示時に上記の
+  // resize/scroll イベントが発火しない・遅れることがある既知のWebKitの
+  // 不具合があり、それが起きると .app が縮まずツールバーがキーボードの
+  // 下（画面最下部）に取り残される。テキストエリアのフォーカス変化に
+  // 合わせて、キーボードのアニメーションが終わる頃まで数回リトライする。
+  const retrySync = () => {
+    syncAppHeight();
+    [50, 150, 300, 500].forEach((ms) => setTimeout(syncAppHeight, ms));
+  };
+  editorEl.addEventListener('focus', retrySync);
+  editorEl.addEventListener('blur', retrySync);
 }
 
 /* ------------------------------------------------------------------ */
