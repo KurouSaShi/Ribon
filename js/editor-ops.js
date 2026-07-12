@@ -148,6 +148,62 @@ editorEl.addEventListener('input', () => {
 });
 
 /* ------------------------------------------------------------------ */
+/* Enterキー：箇条書き（- ）／番号付きリスト（1. ）の継続                 */
+/* リスト行でEnterを押すと、同じ字下げ・マーカー（番号は+1）を付けた       */
+/* 新しい行を挿入する。マーカーの後ろが空のままEnterを押す（＝2回連続で    */
+/* 改行する）とマーカーを取り除いてリストから抜ける。                    */
+/* ------------------------------------------------------------------ */
+
+const ulLineRe = /^(\s*)-\s(.*)$/;
+const olLineRe = /^(\s*)(\d+)\.\s(.*)$/;
+
+editorEl.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter') return;
+  const el = editorEl;
+  if (el.selectionStart !== el.selectionEnd) return; // 選択範囲がある場合は既定動作に任せる
+
+  const { value } = el;
+  const pos = el.selectionStart;
+  const lineStart = value.lastIndexOf('\n', pos - 1) + 1;
+  const beforeCursor = value.slice(lineStart, pos);
+
+  const ulMatch = beforeCursor.match(ulLineRe);
+  const olMatch = beforeCursor.match(olLineRe);
+  if (!ulMatch && !olMatch) return; // 箇条書き／番号付きリストの行でなければ既定動作
+
+  e.preventDefault();
+
+  if (ulMatch) {
+    const [, indent, content] = ulMatch;
+    if (content.trim() === '') {
+      // 空の項目でEnter（2回目の改行）：マーカーを取り除いてリストから抜ける
+      replaceRange(lineStart, pos, indent);
+      const cursorPos = lineStart + indent.length;
+      setSelection(cursorPos, cursorPos);
+      return;
+    }
+    const insertText = '\n' + indent + '- ';
+    replaceRange(pos, pos, insertText);
+    const cursorPos = pos + insertText.length;
+    setSelection(cursorPos, cursorPos);
+    return;
+  }
+
+  const [, indent, num, content] = olMatch;
+  if (content.trim() === '') {
+    replaceRange(lineStart, pos, indent);
+    const cursorPos = lineStart + indent.length;
+    setSelection(cursorPos, cursorPos);
+    return;
+  }
+  const nextNum = parseInt(num, 10) + 1;
+  const insertText = '\n' + indent + nextNum + '. ';
+  replaceRange(pos, pos, insertText);
+  const cursorPos = pos + insertText.length;
+  setSelection(cursorPos, cursorPos);
+});
+
+/* ------------------------------------------------------------------ */
 /* カーソル移動（← →）／選択範囲を広げる（← →）                        */
 /* ------------------------------------------------------------------ */
 
