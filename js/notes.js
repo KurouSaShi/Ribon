@@ -51,10 +51,12 @@ function openSheet() {
   renderNoteList();
   listSheetEl.classList.add('open');
   sheetOverlayEl.classList.add('open');
+  listSheetEl.inert = false; // ボタンをクリック・フォーカス可能にする
 }
 function closeSheet() {
   listSheetEl.classList.remove('open');
   sheetOverlayEl.classList.remove('open');
+  listSheetEl.inert = true; // 閉じている間はメモ本体側にタップを奪われないようにする
 }
 
 function formatDate(ts) {
