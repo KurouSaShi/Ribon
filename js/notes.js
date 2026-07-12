@@ -51,12 +51,10 @@ function openSheet() {
   renderNoteList();
   listSheetEl.classList.add('open');
   sheetOverlayEl.classList.add('open');
-  listSheetEl.inert = false;
 }
 function closeSheet() {
   listSheetEl.classList.remove('open');
   sheetOverlayEl.classList.remove('open');
-  listSheetEl.inert = true;
 }
 
 function formatDate(ts) {

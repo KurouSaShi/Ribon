@@ -1,29 +1,8 @@
 // viewport.js — 編集／プレビュー タブの切り替え、ソフトキーボード対応、
 // PWAのインストールと Service Worker 登録をまとめたモジュール。
 
-import { appEl, editorEl, previewEl, workspaceEl, tabIndicator, tabButtons, installBtn, formatToolbarEl } from './dom.js';
+import { appEl, editorEl, previewEl, workspaceEl, tabIndicator, tabButtons, installBtn } from './dom.js';
 import { toast } from './toast.js';
-
-/* ------------------------------------------------------------------ */
-/* ツールバーの実際の高さを --toolbar-h に反映する                        */
-/* 以前は3段ぶんの高さを常に確保していたため、プラグイン行が無いときに      */
-/* 空白の3段目のような隙間ができていた。ResizeObserverで実寸を測って       */
-/* 反映することで、2段／3段どちらでも隙間なくフィットさせる。              */
-/* ------------------------------------------------------------------ */
-
-export function initToolbarHeight() {
-  if (!formatToolbarEl) return;
-  const sync = () => {
-    const h = formatToolbarEl.getBoundingClientRect().height;
-    if (h > 0) document.documentElement.style.setProperty('--toolbar-h', `${h}px`);
-  };
-  sync();
-  if ('ResizeObserver' in window) {
-    new ResizeObserver(sync).observe(formatToolbarEl);
-  } else {
-    window.addEventListener('resize', sync);
-  }
-}
 
 /* ------------------------------------------------------------------ */
 /* ソフトキーボード対応                                                  */
@@ -36,23 +15,8 @@ export function initToolbarHeight() {
 
 function syncAppHeight() {
   const vv = window.visualViewport;
-  if (!vv) { appEl.style.height = ''; appEl.style.transform = ''; return; }
+  if (!vv) { appEl.style.height = ''; return; }
   appEl.style.height = `${vv.height}px`;
-  // ホーム画面に追加したPWA(standalone)では、キーボード表示中に
-  // visualViewport.offsetTop がリセットされずズレたままになる既知のWebKitの
-  // 不具合がある。height だけ合わせても、この分のズレが黒い隙間として
-  // 残ってしまうため、offsetTop 分を transform で打ち消す。
-  appEl.style.transform = vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
-
-  // iOSのSafari／PWAどちらも、body を position:fixed にしていても、
-  // フォーカスした入力欄を画面内に収めようとして window 自体（レイアウト
-  // ビューポート）をスクロールさせてしまうことがある。この場合
-  // visualViewport.offsetTop の補正だけでは足りず、.format-toolbar が
-  // レイアウト上はキーボードの下（画面外）に押し出されてしまう。
-  // ここで強制的にスクロール位置を 0 に戻して打ち消す。
-  if (window.scrollX !== 0 || window.scrollY !== 0) {
-    window.scrollTo(0, 0);
-  }
 }
 
 export function initKeyboardFix() {
@@ -60,15 +24,6 @@ export function initKeyboardFix() {
   syncAppHeight();
   window.visualViewport.addEventListener('resize', syncAppHeight);
   window.visualViewport.addEventListener('scroll', syncAppHeight);
-
-  // フォーカス直後はキーボードのアニメーションが終わるまで
-  // visualViewport のイベントが遅れて発火することがあるため、
-  // 少し時間を置いて念のためもう一度スクロール位置を補正する。
-  editorEl.addEventListener('focus', () => {
-    window.scrollTo(0, 0);
-    setTimeout(() => { window.scrollTo(0, 0); syncAppHeight(); }, 50);
-    setTimeout(() => { window.scrollTo(0, 0); syncAppHeight(); }, 300);
-  });
 }
 
 /* ------------------------------------------------------------------ */
