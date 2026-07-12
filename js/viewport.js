@@ -27,11 +27,10 @@ export function initToolbarHeight() {
 
 /* ------------------------------------------------------------------ */
 /* ソフトキーボード対応                                                  */
-/* body を position:fixed にして丸ごと高さを合わせる方式は、Safari独自の */
-/* 「前後移動／完了」バーの分だけズレて隙間ができてしまった。            */
-/* 今回は .app 自体の高さだけを直接指定する。body は通常のまま（固定      */
-/* 配置にしない）なので、計算が多少ズレても不可視の隙間にはならず、      */
-/* はみ出した分は通常のページスクロールとして自然に吸収される。         */
+/* resize/scroll イベントに頼る方式だと、端末によっては visualViewport の */
+/* イベントが確実に発火せず、.app の高さが更新されずツールバーがキー     */
+/* ボードの下に取り残されることがある。イベントを待つのではなく、        */
+/* テキストエリアにフォーカスがある間は毎フレーム能動的に測り直す。      */
 /* ------------------------------------------------------------------ */
 
 function syncAppHeight() {
@@ -40,11 +39,26 @@ function syncAppHeight() {
   appEl.style.height = `${vv.height}px`;
 }
 
+let pollId = null;
+function pollAppHeight() {
+  syncAppHeight();
+  pollId = requestAnimationFrame(pollAppHeight);
+}
+function startPolling() {
+  if (pollId === null) pollAppHeight();
+}
+function stopPolling() {
+  if (pollId !== null) { cancelAnimationFrame(pollId); pollId = null; }
+  syncAppHeight(); // 最後にもう一度、キーボードを閉じた後の高さに合わせる
+}
+
 export function initKeyboardFix() {
   if (!window.visualViewport) return; // 非対応ブラウザは元の100dvhのまま
   syncAppHeight();
   window.visualViewport.addEventListener('resize', syncAppHeight);
   window.visualViewport.addEventListener('scroll', syncAppHeight);
+  editorEl.addEventListener('focus', startPolling);
+  editorEl.addEventListener('blur', stopPolling);
 }
 
 /* ------------------------------------------------------------------ */
