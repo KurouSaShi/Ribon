@@ -1,8 +1,30 @@
-// viewport.js — 編集／プレビュー タブの切り替え、PWAのインストールと
-// Service Worker 登録をまとめたモジュール。
+// viewport.js — 編集／プレビュー タブの切り替え、ソフトキーボード対応、
+// PWAのインストールと Service Worker 登録をまとめたモジュール。
 
 import { appEl, editorEl, previewEl, workspaceEl, tabIndicator, tabButtons, installBtn } from './dom.js';
 import { toast } from './toast.js';
+
+/* ------------------------------------------------------------------ */
+/* ソフトキーボード対応                                                  */
+/* body を position:fixed にして丸ごと高さを合わせる方式は、Safari独自の */
+/* 「前後移動／完了」バーの分だけズレて隙間ができてしまった。            */
+/* 今回は .app 自体の高さだけを直接指定する。body は通常のまま（固定      */
+/* 配置にしない）なので、計算が多少ズレても不可視の隙間にはならず、      */
+/* はみ出した分は通常のページスクロールとして自然に吸収される。         */
+/* ------------------------------------------------------------------ */
+
+function syncAppHeight() {
+  const vv = window.visualViewport;
+  if (!vv) { appEl.style.height = ''; return; }
+  appEl.style.height = `${vv.height}px`;
+}
+
+export function initKeyboardFix() {
+  if (!window.visualViewport) return; // 非対応ブラウザは元の100dvhのまま
+  syncAppHeight();
+  window.visualViewport.addEventListener('resize', syncAppHeight);
+  window.visualViewport.addEventListener('scroll', syncAppHeight);
+}
 
 /* ------------------------------------------------------------------ */
 /* タブ（編集／プレビュー）                                              */
