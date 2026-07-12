@@ -242,7 +242,6 @@ textarea { font-size: 16px; /* iOSの自動ズーム防止 */ }
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
-  height: calc(var(--toolbar-h) + var(--sab));
   padding-bottom: var(--sab);
   background: var(--graphite);
   border-top: 1px solid #000;
@@ -411,7 +410,7 @@ button.ft-stat:active, button.ft-stat.pressed { background: rgba(255,255,255,0.1
 .table-panel {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--toolbar-h) + var(--sab) + 10px);
+  bottom: calc(var(--toolbar-h) + 10px);
   transform: translateX(-50%);
   display: none;
   flex-direction: column;
