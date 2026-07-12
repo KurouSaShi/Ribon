@@ -27,29 +27,32 @@ export function initToolbarHeight() {
 
 /* ------------------------------------------------------------------ */
 /* ソフトキーボード対応                                                  */
-/* resize/scroll イベントに頼る方式だと、端末によっては visualViewport の */
-/* イベントが確実に発火せず、.app の高さが更新されずツールバーがキー     */
-/* ボードの下に取り残されることがある。イベントを待つのではなく、        */
-/* テキストエリアにフォーカスがある間は毎フレーム能動的に測り直す。      */
+/* body を position:fixed にして丸ごと高さを合わせる方式は、Safari独自の */
+/* 「前後移動／完了」バーの分だけズレて隙間ができてしまった。            */
+/* 今回は .app 自体の高さだけを直接指定する。body は通常のまま（固定      */
+/* 配置にしない）なので、計算が多少ズレても不可視の隙間にはならず、      */
+/* はみ出した分は通常のページスクロールとして自然に吸収される。         */
 /* ------------------------------------------------------------------ */
 
 function syncAppHeight() {
   const vv = window.visualViewport;
-  if (!vv) { appEl.style.height = ''; return; }
+  if (!vv) { appEl.style.height = ''; appEl.style.transform = ''; return; }
   appEl.style.height = `${vv.height}px`;
-}
+  // ホーム画面に追加したPWA(standalone)では、キーボード表示中に
+  // visualViewport.offsetTop がリセットされずズレたままになる既知のWebKitの
+  // 不具合がある。height だけ合わせても、この分のズレが黒い隙間として
+  // 残ってしまうため、offsetTop 分を transform で打ち消す。
+  appEl.style.transform = vv.offsetTop ? `translateY(${vv.offsetTop}px)` : '';
 
-let pollId = null;
-function pollAppHeight() {
-  syncAppHeight();
-  pollId = requestAnimationFrame(pollAppHeight);
-}
-function startPolling() {
-  if (pollId === null) pollAppHeight();
-}
-function stopPolling() {
-  if (pollId !== null) { cancelAnimationFrame(pollId); pollId = null; }
-  syncAppHeight(); // 最後にもう一度、キーボードを閉じた後の高さに合わせる
+  // iOSのSafari／PWAどちらも、body を position:fixed にしていても、
+  // フォーカスした入力欄を画面内に収めようとして window 自体（レイアウト
+  // ビューポート）をスクロールさせてしまうことがある。この場合
+  // visualViewport.offsetTop の補正だけでは足りず、.format-toolbar が
+  // レイアウト上はキーボードの下（画面外）に押し出されてしまう。
+  // ここで強制的にスクロール位置を 0 に戻して打ち消す。
+  if (window.scrollX !== 0 || window.scrollY !== 0) {
+    window.scrollTo(0, 0);
+  }
 }
 
 export function initKeyboardFix() {
@@ -57,8 +60,15 @@ export function initKeyboardFix() {
   syncAppHeight();
   window.visualViewport.addEventListener('resize', syncAppHeight);
   window.visualViewport.addEventListener('scroll', syncAppHeight);
-  editorEl.addEventListener('focus', startPolling);
-  editorEl.addEventListener('blur', stopPolling);
+
+  // フォーカス直後はキーボードのアニメーションが終わるまで
+  // visualViewport のイベントが遅れて発火することがあるため、
+  // 少し時間を置いて念のためもう一度スクロール位置を補正する。
+  editorEl.addEventListener('focus', () => {
+    window.scrollTo(0, 0);
+    setTimeout(() => { window.scrollTo(0, 0); syncAppHeight(); }, 50);
+    setTimeout(() => { window.scrollTo(0, 0); syncAppHeight(); }, 300);
+  });
 }
 
 /* ------------------------------------------------------------------ */
