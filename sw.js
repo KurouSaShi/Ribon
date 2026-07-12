@@ -2,7 +2,7 @@
    Caches the app shell so the editor keeps working offline once installed.
    Bump CACHE_VERSION whenever a shipped asset changes. */
 
-const CACHE_VERSION = 'ribbon-v9';
+const CACHE_VERSION = 'ribbon-v10';
 const SCOPE_URL = new URL(self.registration.scope);
 
 const APP_SHELL = [
