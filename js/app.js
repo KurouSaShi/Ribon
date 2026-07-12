@@ -15,7 +15,7 @@
 //   highlight.js   特殊文字ハイライトのオーバーレイ描画
 //   settings.js    文字サイズ・ハイライト設定の永続化とUI配線
 
-import { initTabs, initPwa, initKeyboardFix } from './viewport.js';
+import { initTabs, initPwa, initKeyboardFix, initToolbarHeight } from './viewport.js';
 import { initToolbar } from './toolbar.js';
 import { initNotes } from './notes.js';
 import { initExport } from './export.js';
@@ -32,3 +32,4 @@ initExport();
 initPwa();
 initSettings();
 initPlugins();
+initToolbarHeight();
