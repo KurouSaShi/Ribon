@@ -114,18 +114,26 @@ export function renderNoteList() {
   });
 }
 
+// 新規メモを作成して開く。content を渡すと、その内容で新規メモを作る
+// （プラグインの Ribbon.notes.createNew から利用される）。
+export function createNewNote(content) {
+  if (dirty) doSave();
+  const note = newNoteObject();
+  if (typeof content === 'string') note.content = content;
+  setCurrentNote(note);
+  saveNote(note);
+  renderNoteList();
+  closeSheet();
+  setView('edit');
+  return note;
+}
+
 export function initNotes() {
   listBtn.addEventListener('click', openSheet);
   sheetOverlayEl.addEventListener('click', closeSheet);
 
   newNoteBtn.addEventListener('click', () => {
-    if (dirty) doSave();
-    const note = newNoteObject();
-    setCurrentNote(note);
-    saveNote(note);
-    renderNoteList();
-    closeSheet();
-    setView('edit');
+    createNewNote();
     toast('新規メモを作成しました');
     editorEl.focus();
   });

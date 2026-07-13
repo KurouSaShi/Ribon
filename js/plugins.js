@@ -4,13 +4,16 @@
 // 追加すること。
 
 import { editorEl, ftRowsEl, pluginItemsEl, addPluginBtn, pluginFileInput } from './dom.js';
-import { loadPluginIndex, savePluginIndex, pluginId, PLUGIN_SRC_PREFIX } from './storage.js';
+import { loadPluginIndex, savePluginIndex, pluginId, PLUGIN_SRC_PREFIX, makePluginStorage } from './storage.js';
 import { bindPressable } from './press.js';
 import {
   getSelection, setSelection, insertAtCursor, replaceRange, wrapSelection, prefixLines,
   onChange,
 } from './editor-ops.js';
 import { toast } from './toast.js';
+import { createNewNote } from './notes.js';
+import { dialogAlert, dialogConfirm, dialogPrompt } from './dialog.js';
+import { progressShow, progressUpdate, progressHide } from './progress.js';
 
 // プラグインが追加したコマンドは3段目（横スクロール行）にまとめる。
 // 最初のコマンドが登録された時点で行を作成する。
@@ -32,10 +35,24 @@ function emitPluginEvent(name, payload) {
 }
 onChange(() => emitPluginEvent('save'));
 
+// 決められたドメインしか叩けない、といった制限は設けていない
+// （プラグインは信頼できる作成者のものだけを追加する前提のため）。
+// レスポンスの扱いを毎回書かなくて済むよう、よく使う形だけラップする。
+async function networkFetchText(url, options) {
+  const res = await fetch(url, options);
+  return res.text();
+}
+async function networkFetchJSON(url, options) {
+  const res = await fetch(url, options);
+  return res.json();
+}
+
 // プラグインから見える公開 API。書式操作や保存処理を直接いじらせず、
-// 安全にラップした関数だけを渡す。
+// 安全にラップした関数だけを渡す。addCommand 内では `this` を使って
+// 呼び出し元のプラグイン専用インスタンス（storage が隔離されたもの）を
+// そのままコールバックへ渡す。
 const Ribbon = {
-  version: '1.0',
+  version: '1.1',
   editor: {
     getValue: () => editorEl.value,
     setValue: (text) => {
@@ -50,6 +67,28 @@ const Ribbon = {
     replaceRange: (s, e, text) => replaceRange(s, e, text),
     wrapSelection: (before, after, placeholder) => wrapSelection(before, after, placeholder),
     prefixLines: (prefix) => prefixLines(prefix),
+  },
+  // ネットワークAPI：fetch のラッパー。生の Response が欲しい場合は fetch を使う。
+  network: {
+    fetch: (url, options) => fetch(url, options),
+    fetchText: (url, options) => networkFetchText(url, options),
+    fetchJSON: (url, options) => networkFetchJSON(url, options),
+  },
+  // メモAPI：新規メモを作成して開く。
+  notes: {
+    createNew: (content) => createNewNote(content),
+  },
+  // ダイアログAPI：alert / confirm / prompt はいずれも Promise を返す。
+  dialog: {
+    alert: (message, title) => dialogAlert(message, title),
+    confirm: (message, title) => dialogConfirm(message, title),
+    prompt: (message, defaultValue, title) => dialogPrompt(message, defaultValue, title),
+  },
+  // 進捗表示API：show → 必要に応じて update を連続呼び出し → hide。
+  progress: {
+    show: (message, percent) => progressShow(message, percent),
+    update: (percent, message) => progressUpdate(percent, message),
+    hide: () => progressHide(),
   },
   // ツールバー3段目にボタンを追加する。onLongPress は省略可。
   addCommand({ id, label, title, onTap, onLongPress } = {}) {
@@ -67,11 +106,11 @@ const Ribbon = {
     row.appendChild(btn);
     bindPressable(btn, {
       onTap: () => {
-        try { onTap(Ribbon); }
+        try { onTap(this); }
         catch (err) { console.error('[plugin]', err); toast('プラグインの実行でエラーが発生しました'); }
       },
       onLongPressStart: onLongPress
-        ? () => { try { onLongPress(Ribbon); } catch (err) { console.error('[plugin]', err); } }
+        ? () => { try { onLongPress(this); } catch (err) { console.error('[plugin]', err); } }
         : undefined,
     });
     return btn;
@@ -84,11 +123,17 @@ const Ribbon = {
 };
 window.Ribbon = Ribbon;
 
+// プラグインごとに storage だけを差し替えた専用インスタンスを作る。
+// これにより Ribbon.storage は他のプラグインから読み書きできない。
+function createRibbonForPlugin(id) {
+  return { ...Ribbon, storage: makePluginStorage(id) };
+}
+
 function loadPlugin(entry) {
   try {
     const src = localStorage.getItem(PLUGIN_SRC_PREFIX + entry.id) || '';
     const run = new Function('Ribbon', src);
-    run(Ribbon);
+    run(createRibbonForPlugin(entry.id));
     return true;
   } catch (err) {
     console.error('[plugin] 読み込みに失敗しました:', entry.name, err);

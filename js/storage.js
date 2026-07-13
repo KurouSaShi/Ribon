@@ -69,3 +69,48 @@ export function savePluginIndex(list) {
 export function pluginId() {
   return 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
+
+/* ---- プラグインごとの永続ストレージ（Ribbon.storage で公開） ---- */
+// 各プラグインの id ごとに名前空間を分け、他のプラグインのデータを
+// 読み書きできないようにする。
+
+export function makePluginStorage(id) {
+  const prefix = `ribbon:plugin-data:${id}:`;
+  return {
+    // 保存した値を取得する。未保存なら fallback（省略時は null）を返す。
+    get(key, fallback = null) {
+      try {
+        const raw = localStorage.getItem(prefix + key);
+        return raw === null ? fallback : JSON.parse(raw);
+      } catch {
+        return fallback;
+      }
+    },
+    // 値を保存する。JSON化できる値ならなんでも渡せる。
+    set(key, value) {
+      try {
+        localStorage.setItem(prefix + key, JSON.stringify(value));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    // 指定したキーを削除する。
+    remove(key) {
+      localStorage.removeItem(prefix + key);
+    },
+    // このプラグインが保存しているキー一覧を返す。
+    keys() {
+      const out = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(prefix)) out.push(k.slice(prefix.length));
+      }
+      return out;
+    },
+    // このプラグインが保存したデータを全て消す。
+    clear() {
+      this.keys().forEach((k) => localStorage.removeItem(prefix + k));
+    },
+  };
+}
